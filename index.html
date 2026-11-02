@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id"><head>
   <meta charset="UTF-8">
@@ -1624,6 +1623,11 @@
             <input type="number" id="inputWaktu" min="1" max="180" class="form-control" value="35">
           </div>
           <div class="form-group">
+            <label for="inputMinWaktu">Waktu Minimal Kumpulkan (Menit):</label>
+            <input type="number" id="inputMinWaktu" min="0" max="180" class="form-control" value="5">
+            <small style="font-size:11.5px; color:var(--text-muted);">Siswa tidak dapat langsung mengumpulkan jawaban sebelum waktu ini selesai.</small>
+          </div>
+          <div class="form-group">
             <label for="inputJumlahSoal">Jumlah Soal Ditampilkan:</label>
             <input type="number" id="inputJumlahSoal" min="0" class="form-control" value="0">
             <small style="font-size:11.5px; color:var(--text-muted);">Isi 0 untuk menampilkan semua soal.</small>
@@ -1663,7 +1667,8 @@
         <div style="display:flex; gap:10px;">
           <button class="btn btn-success btn-sm" onclick="simpanWaktu(); simpanJumlahSoal(); simpanPengaturanNilai(); simpanMaxPelanggaran();">💾 Simpan Semua Parameter</button>
         </div>
-        <div id="statusWaktu" style="margin-top:10px;"><div class="alert alert-success">✅ Jumlah soal ditampilkan: <strong>Semua Soal</strong>.</div></div>
+        <div id="statusWaktu" style="margin-top:10px;"></div>
+        <div id="statusJumlahSoal" style="margin-top:4px;"></div>
         <div id="statusPengaturanNilai" style="margin-top:4px;"><div class="alert alert-success">✅ Pengaturan Score disimpan! Maksimal: <strong>100</strong>, KKM: <strong>75</strong>, Tampilkan: <strong>Ya</strong></div></div>
         <div id="statusMaxPelanggaran" style="margin-top:4px;"><div class="alert alert-success">✅ Batas pelanggaran disimpan: <strong>6 kali</strong>.</div></div>
       </div>
@@ -2148,6 +2153,7 @@ const GOOGLE_ACCOUNT_DEFAULT = "universitasgprs@gmail.com";
 const GOOGLE_FOLDER_DEFAULT = "___MANAJEMEN SEKOLAH 2026";
 const GOOGLE_DRIVE_LINK_DEFAULT = "https://drive.google.com/drive/folders/1dcGEDUjrD8f_0PQTYGoUbWvx3DZ0fTKi?usp=drive_link";
 const DURASI_DEFAULT = 35;
+const MIN_WAKTU_DEFAULT = 5;
 const JUMLAH_SOAL_DEFAULT = 0;
 const ACAK_DEFAULT = true;
 const ACAK_OPSI_DEFAULT = true;
@@ -2168,6 +2174,7 @@ let configGoogleAccount = localStorage.getItem('configGoogleAccount') !== null ?
 let configGoogleFolder = localStorage.getItem('configGoogleFolder') !== null ? localStorage.getItem('configGoogleFolder') : (typeof GOOGLE_FOLDER_DEFAULT !== 'undefined' ? GOOGLE_FOLDER_DEFAULT : "");
 let configGoogleDriveLink = localStorage.getItem('configGoogleDriveLink') !== null ? localStorage.getItem('configGoogleDriveLink') : (typeof GOOGLE_DRIVE_LINK_DEFAULT !== 'undefined' ? GOOGLE_DRIVE_LINK_DEFAULT : "");
 let configDurasi = parseInt(localStorage.getItem('configDurasi') || (typeof DURASI_DEFAULT !== 'undefined' ? DURASI_DEFAULT : 35));
+let configMinWaktu = parseInt(localStorage.getItem('configMinWaktu') || (typeof MIN_WAKTU_DEFAULT !== 'undefined' ? MIN_WAKTU_DEFAULT : 5));
 let configJumlahSoal = parseInt(localStorage.getItem('configJumlahSoal') || (typeof JUMLAH_SOAL_DEFAULT !== 'undefined' ? JUMLAH_SOAL_DEFAULT : 0));
 let configAcak = localStorage.getItem('configAcak') !== null ? localStorage.getItem('configAcak') === 'true' : (typeof ACAK_DEFAULT !== 'undefined' ? ACAK_DEFAULT : true);
 let configAcakOpsi = localStorage.getItem('configAcakOpsi') !== null ? localStorage.getItem('configAcakOpsi') === 'true' : (typeof ACAK_OPSI_DEFAULT !== 'undefined' ? ACAK_OPSI_DEFAULT : true);
@@ -2510,6 +2517,15 @@ function autoSaveDashboardGuru(fieldName = '') {
         AppStorage.setItem('configDurasi', configDurasi);
       }
     }
+    const inMinWaktu = document.getElementById('inputMinWaktu');
+    if (inMinWaktu) {
+      const minVal = parseInt(inMinWaktu.value);
+      if (!isNaN(minVal) && minVal >= 0 && minVal <= configDurasi) {
+        configMinWaktu = minVal;
+        localStorage.setItem('configMinWaktu', configMinWaktu);
+        AppStorage.setItem('configMinWaktu', configMinWaktu);
+      }
+    }
     const inJumlahSoal = document.getElementById('inputJumlahSoal');
     if (inJumlahSoal) {
       const jVal = parseInt(inJumlahSoal.value);
@@ -2590,6 +2606,7 @@ function pasangAutoSaveDashboardGuru() {
     { id: 'inputSubJudul', name: 'Subjudul' },
     { id: 'inputToken', name: 'Token' },
     { id: 'inputWaktu', name: 'Durasi Waktu' },
+    { id: 'inputMinWaktu', name: 'Waktu Minimal Kumpul' },
     { id: 'inputJumlahSoal', name: 'Jumlah Soal' },
     { id: 'inputNilaiMaksimal', name: 'Nilai Maksimal' },
     { id: 'inputNilaiKKM', name: 'KKM' },
@@ -3509,28 +3526,43 @@ function simpanWaktu() {
     document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-error">❌ Waktu harus antara 1 - 180 menit!</div>';
     return;
   }
+  const minWaktuEl = document.getElementById('inputMinWaktu');
+  let minWaktu = minWaktuEl ? parseInt(minWaktuEl.value) : configMinWaktu;
+  if (isNaN(minWaktu) || minWaktu < 0) {
+    document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-error">❌ Waktu minimal kumpulkan tidak boleh negatif!</div>';
+    return;
+  }
+  if (minWaktu > waktu) {
+    document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-error">❌ Waktu minimal kumpulkan (' + minWaktu + ' menit) tidak boleh melebihi durasi ujian (' + waktu + ' menit)!</div>';
+    return;
+  }
   configDurasi = waktu;
+  configMinWaktu = minWaktu;
   localStorage.setItem('configDurasi', configDurasi);
-  document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-success">✅ Durasi ujian disimpan: <strong>' + configDurasi + ' menit</strong>.</div>';
+  localStorage.setItem('configMinWaktu', configMinWaktu);
+  AppStorage.setItem('configDurasi', configDurasi);
+  AppStorage.setItem('configMinWaktu', configMinWaktu);
+  document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-success">✅ Pengaturan waktu disimpan! Durasi: <strong>' + configDurasi + ' menit</strong> | Waktu minimal kumpul: <strong>' + configMinWaktu + ' menit</strong>.</div>';
   updateInfoWaktu();
 }
 
 function simpanJumlahSoal() {
   const jml = parseInt(document.getElementById('inputJumlahSoal').value);
+  const statusEl = document.getElementById('statusJumlahSoal') || document.getElementById('statusWaktu');
   if (isNaN(jml) || jml < 0) {
-    document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-error">❌ Jumlah soal tidak valid!</div>';
+    if (statusEl) statusEl.innerHTML = '<div class="alert alert-error">❌ Jumlah soal tidak valid!</div>';
     return;
   }
   configJumlahSoal = jml;
   localStorage.setItem('configJumlahSoal', configJumlahSoal);
-  document.getElementById('statusWaktu').innerHTML = '<div class="alert alert-success">✅ Jumlah soal ditampilkan: <strong>' + (configJumlahSoal === 0 ? 'Semua Soal' : configJumlahSoal + ' Soal') + '</strong>.</div>';
+  if (statusEl) statusEl.innerHTML = '<div class="alert alert-success">✅ Jumlah soal ditampilkan: <strong>' + (configJumlahSoal === 0 ? 'Semua Soal' : configJumlahSoal + ' Soal') + '</strong>.</div>';
   updateInfoWaktu();
 }
 
 function updateInfoWaktu() {
   const infoBox = document.getElementById('infoWaktu');
   if (infoBox) {
-    infoBox.innerHTML = '⏰ Waktu: <strong>' + configDurasi + ' menit</strong> | Soal: <strong>' + (configJumlahSoal === 0 ? 'Semua' : configJumlahSoal) + '</strong>';
+    infoBox.innerHTML = '⏰ Waktu: <strong>' + configDurasi + ' menit</strong> (Minimal pengerjaan: <strong>' + configMinWaktu + ' menit</strong>) | Soal: <strong>' + (configJumlahSoal === 0 ? 'Semua' : configJumlahSoal) + '</strong>';
   }
   const maxInfo = document.getElementById('maxPelanggaranInfo');
   if (maxInfo) maxInfo.innerText = configMaxPelanggaran;
@@ -3816,6 +3848,7 @@ function loadDashboardData() {
 
   updatePasswordDisplay();
   document.getElementById('inputWaktu').value = configDurasi;
+  if (document.getElementById('inputMinWaktu')) document.getElementById('inputMinWaktu').value = configMinWaktu;
   document.getElementById('inputJumlahSoal').value = configJumlahSoal;
   document.getElementById('inputNilaiMaksimal').value = configNilaiMaksimal;
   document.getElementById('inputNilaiKKM').value = configNilaiKKM;
@@ -3958,6 +3991,7 @@ function inisialisasiCbtUI() {
   renderCbtSoal();
   updateProgressBar();
   updateTampilanPelanggaran();
+  updateStatusTombolKumpul();
 }
 
 function renderQuestionNavGrid() {
@@ -4178,14 +4212,59 @@ function mulaiTimer() {
       }
     }
 
-    // Aktifkan tombol kumpul jika sudah melewati 5 menit atau waktu habis
-    if (elapsed >= Math.min(300, durasi)) {
-      ['btnKumpul', 'btnKumpulCbt', 'btnKumpulSidebar'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.disabled = false;
-      });
-    }
+    // Update status dan label tombol kumpulkan berdasarkan waktu minimal
+    updateStatusTombolKumpul(elapsed);
   }, 1000);
+}
+
+function updateStatusTombolKumpul(elapsedSeconds) {
+  if (typeof waktuMulai === 'undefined' || !waktuMulai) return;
+  const elapsed = typeof elapsedSeconds === 'number' ? elapsedSeconds : Math.floor((Date.now() - waktuMulai) / 1000);
+  const minSeconds = Math.min((configMinWaktu || 0) * 60, durasi);
+  const sisaTunggu = minSeconds - elapsed;
+
+  const btnCbt = document.getElementById('btnKumpulCbt');
+  const btnClassic = document.getElementById('btnKumpul');
+  const btnSidebar = document.getElementById('btnKumpulSidebar');
+
+  if (sisaTunggu <= 0) {
+    if (btnCbt) {
+      btnCbt.disabled = false;
+      btnCbt.innerHTML = '✔ Selesai &amp; Kumpulkan';
+      btnCbt.title = 'Kumpulkan seluruh lembar jawaban ujian';
+    }
+    if (btnClassic) {
+      btnClassic.disabled = false;
+      btnClassic.innerHTML = 'Kumpulkan Jawaban';
+      btnClassic.title = 'Kumpulkan seluruh lembar jawaban ujian';
+    }
+    if (btnSidebar) {
+      btnSidebar.disabled = false;
+      btnSidebar.innerHTML = '✔ Kumpulkan Ujian';
+      btnSidebar.title = 'Kumpulkan seluruh lembar jawaban ujian';
+    }
+  } else {
+    const menitTunggu = Math.floor(sisaTunggu / 60);
+    const detikTunggu = sisaTunggu % 60;
+    const waktuTungguStr = String(menitTunggu).padStart(2, '0') + ':' + String(detikTunggu).padStart(2, '0');
+    const infoTooltip = 'Waktu minimal pengerjaan belum tercapai. Harap periksa dan maksimalkan waktu ujian Anda! Sisa tunggu: ' + waktuTungguStr;
+
+    if (btnCbt) {
+      btnCbt.disabled = true;
+      btnCbt.innerHTML = '⏳ Tunggu (' + waktuTungguStr + ')';
+      btnCbt.title = infoTooltip;
+    }
+    if (btnClassic) {
+      btnClassic.disabled = true;
+      btnClassic.innerHTML = '⏳ Belum Dapat Dikumpulkan (' + waktuTungguStr + ')';
+      btnClassic.title = infoTooltip;
+    }
+    if (btnSidebar) {
+      btnSidebar.disabled = true;
+      btnSidebar.innerHTML = '⏳ Kumpulkan (' + waktuTungguStr + ')';
+      btnSidebar.title = infoTooltip;
+    }
+  }
 }
 
 function enterFullscreen() {
@@ -4430,9 +4509,13 @@ function renderLogForensikDashboard() {
 // --- SUBMISSION & SPREADSHEET SYNC ---
 function kumpulkan() {
   const elapsed = Math.floor((Date.now() - waktuMulai) / 1000);
-  const minTime = Math.min(300, durasi);
+  const minTime = Math.min((configMinWaktu || 0) * 60, durasi);
   if (elapsed < minTime) {
-    alert('⚠️ Ujian belum dapat dikumpulkan sebelum 5 menit pengerjaan!\n\nSisa waktu tunggu: ' + Math.ceil((minTime - elapsed) / 60) + ' menit lagi.');
+    const sisaDetik = minTime - elapsed;
+    const m = Math.floor(sisaDetik / 60);
+    const s = sisaDetik % 60;
+    const waktuSisaStr = m > 0 ? (m + ' menit ' + s + ' detik') : (s + ' detik');
+    alert('⚠️ UJIAN BELUM DAPAT DIKUMPULKAN!\n\nDemi memaksimalkan hasil evaluasi, Anda diwajibkan memanfaatkan waktu ujian dengan sebaik-baiknya untuk meneliti dan memeriksa kembali jawaban Anda.\n\nSisa waktu tunggu pengumpulan: ' + waktuSisaStr + ' lagi.');
     return;
   }
   if (!confirm('Apakah Anda yakin ingin mengumpulkan seluruh jawaban ujian ini?')) return;
@@ -5072,6 +5155,7 @@ function simpanPermanenKeHTML() {
       'const GOOGLE_FOLDER_DEFAULT = ' + JSON.stringify(configGoogleFolder) + ';\n' +
       'const GOOGLE_DRIVE_LINK_DEFAULT = ' + JSON.stringify(configGoogleDriveLink) + ';\n' +
       'const DURASI_DEFAULT = ' + JSON.stringify(configDurasi) + ';\n' +
+      'const MIN_WAKTU_DEFAULT = ' + JSON.stringify(configMinWaktu) + ';\n' +
       'const JUMLAH_SOAL_DEFAULT = ' + JSON.stringify(configJumlahSoal) + ';\n' +
       'const ACAK_DEFAULT = ' + JSON.stringify(configAcak) + ';\n' +
       'const ACAK_OPSI_DEFAULT = ' + JSON.stringify(configAcakOpsi) + ';\n' +
@@ -5092,6 +5176,7 @@ function simpanPermanenKeHTML() {
       'let configGoogleFolder = localStorage.getItem(\'configGoogleFolder\') !== null ? localStorage.getItem(\'configGoogleFolder\') : (typeof GOOGLE_FOLDER_DEFAULT !== \'undefined\' ? GOOGLE_FOLDER_DEFAULT : "");\n' +
       'let configGoogleDriveLink = localStorage.getItem(\'configGoogleDriveLink\') !== null ? localStorage.getItem(\'configGoogleDriveLink\') : (typeof GOOGLE_DRIVE_LINK_DEFAULT !== \'undefined\' ? GOOGLE_DRIVE_LINK_DEFAULT : "");\n' +
       'let configDurasi = parseInt(localStorage.getItem(\'configDurasi\') || (typeof DURASI_DEFAULT !== \'undefined\' ? DURASI_DEFAULT : ' + configDurasi + '));\n' +
+      'let configMinWaktu = parseInt(localStorage.getItem(\'configMinWaktu\') || (typeof MIN_WAKTU_DEFAULT !== \'undefined\' ? MIN_WAKTU_DEFAULT : ' + configMinWaktu + '));\n' +
       'let configJumlahSoal = parseInt(localStorage.getItem(\'configJumlahSoal\') || (typeof JUMLAH_SOAL_DEFAULT !== \'undefined\' ? JUMLAH_SOAL_DEFAULT : ' + configJumlahSoal + '));\n' +
       'let configAcak = localStorage.getItem(\'configAcak\') !== null ? localStorage.getItem(\'configAcak\') === \'true\' : (typeof ACAK_DEFAULT !== \'undefined\' ? ACAK_DEFAULT : ' + configAcak + ');\n' +
       'let configAcakOpsi = localStorage.getItem(\'configAcakOpsi\') !== null ? localStorage.getItem(\'configAcakOpsi\') === \'true\' : (typeof ACAK_OPSI_DEFAULT !== \'undefined\' ? ACAK_OPSI_DEFAULT : ' + configAcakOpsi + ');\n' +
