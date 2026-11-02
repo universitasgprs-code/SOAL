@@ -1268,7 +1268,9 @@
       </div>
       <div class="form-group">
         <label for="kelas">Kelas:</label>
-        <input type="text" id="kelas" class="form-control" placeholder="Contoh: X DKV 1" autocomplete="off">
+        <select id="kelas" class="form-control">
+          <option value="">-- Pilih Kelas --</option>
+        </select>
       </div>
     </div>
 
@@ -2474,6 +2476,8 @@ function pasangAutoSaveInputSiswa() {
     if (el) {
       el.removeEventListener('input', simpanDraftIdentitasSiswa);
       el.addEventListener('input', simpanDraftIdentitasSiswa);
+      el.removeEventListener('change', simpanDraftIdentitasSiswa);
+      el.addEventListener('change', simpanDraftIdentitasSiswa);
     }
   });
   const mapelEl = document.getElementById('selectMapelSiswa');
@@ -2671,6 +2675,7 @@ function simpanMapelDb() {
   AppStorage.setItem('soalMapelDb', JSON.stringify(soalMapelDb));
   renderTabelMapel();
   updateSelectMapelSiswa();
+  updateSelectKelasSiswa();
   updateSelectMapelImport();
   updateDashboardMetrics();
   pasangAutoSaveDashboardGuru();
@@ -2683,6 +2688,7 @@ function simpanJadwalUjianDb() {
   AppStorage.setItem('jadwalUjianDb', JSON.stringify(jadwalUjianDb));
   renderTabelJadwal();
   updateDashboardMetrics();
+  updateSelectKelasSiswa();
 }
 
 // --- TAB SWITCHER DASHBOARD GURU ---
@@ -2845,6 +2851,50 @@ function updateSelectMapelSiswa() {
   });
   select.innerHTML = html;
   if (mapelDb.includes(currentVal)) {
+    select.value = currentVal;
+  }
+}
+
+function updateSelectKelasSiswa() {
+  const select = document.getElementById('kelas');
+  if (!select) return;
+  const currentVal = select.value;
+
+  let allowedClasses = [];
+  let isSemua = false;
+
+  if (jadwalUjianDb && jadwalUjianDb.length > 0) {
+    jadwalUjianDb.forEach(j => {
+      const k = j.kelas.trim();
+      if (k.toLowerCase() === 'semua') {
+        isSemua = true;
+      } else if (k) {
+        allowedClasses.push(k);
+      }
+    });
+  } else {
+    isSemua = true;
+  }
+
+  let uniqueClasses = [];
+  if (isSemua) {
+    // If open to all, use all classes from dataSiswaDb
+    uniqueClasses = Array.from(new Set(dataSiswaDb.map(s => s.kelas.trim()).filter(Boolean))).sort();
+  } else {
+    // Only use explicitly scheduled classes
+    uniqueClasses = Array.from(new Set(allowedClasses)).sort();
+  }
+
+  let html = '<option value="">-- Pilih Kelas --</option>';
+  uniqueClasses.forEach(k => {
+    html += '<option value="' + k + '">' + k + '</option>';
+  });
+
+  select.innerHTML = html;
+
+  // Restore selected value if it still exists in the new options
+  const isValueStillAvailable = uniqueClasses.some(k => k === currentVal);
+  if (isValueStillAvailable && currentVal !== "") {
     select.value = currentVal;
   }
 }
@@ -3797,6 +3847,7 @@ function bukaFormSiswa() {
   document.getElementById('menuAwal').style.display = 'none';
   document.getElementById('identityForm').style.display = 'block';
   updateSelectMapelSiswa();
+  updateSelectKelasSiswa();
   updateInfoWaktu();
   muatDraftIdentitasSiswa();
   pasangAutoSaveInputSiswa();
@@ -5233,6 +5284,7 @@ window.onload = function() {
   }
   updateJudulDiSemuaTempat();
   updateSelectMapelSiswa();
+  updateSelectKelasSiswa();
   updateNetworkStatusUI();
   updateHeaderClock();
 
